@@ -31,6 +31,11 @@ var (
 )
 
 func fetch(ctx *gin.Context, env *env.Environment, cookie string, buffer []byte) (response *http.Response, err error) {
+	proxy := env.GetString("cursor.proxy")
+	if proxy == "" {
+		proxy = env.GetString("server.proxied")
+	}
+
 	//count, err := checkUsage(ctx, env, 150)
 	//if err != nil {
 	//	return
@@ -97,7 +102,7 @@ func fetch(ctx *gin.Context, env *env.Environment, cookie string, buffer []byte)
 
 	response, err = emit.ClientBuilder(common.HTTPClient).
 		Context(ctx.Request.Context()).
-		Proxies(env.GetString("server.proxied")).
+		Proxies(proxy).
 		POST("https://api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithToolsSSE").
 		Header("authorization", "Bearer "+cookie).
 		Header("content-type", "application/connect+proto").
