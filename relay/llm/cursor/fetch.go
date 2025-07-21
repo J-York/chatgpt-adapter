@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/bincooo/emit.io"
+	"github.com/bogdanfinn/tls-client/profiles"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
@@ -31,8 +32,28 @@ var (
 )
 
 func fetch(ctx *gin.Context, env *env.Environment, cookie string, buffer []byte) (response *http.Response, err error) {
-	proxy := env.GetString("cursor.proxy")
-	if proxy == "" {
+	var client *emit.Session
+	var proxy string
+
+	// Decide which proxy and client to use
+	cursorProxy := env.GetString("cursor.proxy")
+	if cursorProxy != "" {
+		// Use dedicated proxy for cursor
+		proxy = cursorProxy
+		options := common.GetIdleConnectOptions(env)
+		connTimeout := env.GetInt("server-conn.connTimeout")
+		if connTimeout == 0 {
+			connTimeout = 180
+		}
+		options = append(options, emit.Ja3Helper(emit.Echo{RandomTLSExtension: true, HelloID: profiles.Chrome_124}, connTimeout))
+		client, err = emit.NewSession(proxy, false, nil, options...)
+		if err != nil {
+			logger.Error("Error creating new session for cursor proxy: ", err)
+			return nil, err
+		}
+	} else {
+		// Use global proxy setting
+		client = common.HTTPClient
 		proxy = env.GetString("server.proxied")
 	}
 
@@ -59,9 +80,9 @@ func fetch(ctx *gin.Context, env *env.Environment, cookie string, buffer []byte)
 
 	sessionId := uuid.NewString()
 	configVersion := uuid.NewString()
-	response, err = emit.ClientBuilder(common.HTTPClient).
+	response, err = emit.ClientBuilder(client).
 		Context(ctx.Request.Context()).
-		Proxies(env.GetString("server.proxied")).
+		Proxies(proxy).
 		POST("https://api2.cursor.sh/aiserver.v1.BidiService/BidiAppend").
 		Header("authorization", "Bearer "+cookie).
 		Header("content-type", "application/proto").
@@ -100,7 +121,7 @@ func fetch(ctx *gin.Context, env *env.Environment, cookie string, buffer []byte)
 	header := int32ToBytes(0, len(buffer))
 	buffer = append(header, buffer...)
 
-	response, err = emit.ClientBuilder(common.HTTPClient).
+	response, err = emit.ClientBuilder(client).
 		Context(ctx.Request.Context()).
 		Proxies(proxy).
 		POST("https://api2.cursor.sh/aiserver.v1.ChatService/StreamUnifiedChatWithToolsSSE").
