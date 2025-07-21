@@ -56,6 +56,7 @@ func (api *api) Match(ctx *gin.Context, model string) (ok bool, err error) {
 		"deepseek-v3",
 		"deepseek-r1",
 		"o3-mini",
+		"o4-mini",
 	}...) {
 		if model[7:] == mod {
 			ok = true
@@ -95,6 +96,7 @@ func (api *api) Models() (slice []model.Model) {
 		"deepseek-v3",
 		"deepseek-r1",
 		"o3-mini",
+		"o4-mini",
 	}...) {
 		slice = append(slice, model.Model{
 			Id:      Model + "/" + mod,
